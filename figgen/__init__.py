@@ -3,6 +3,7 @@ import tempfile
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import wandb
@@ -128,3 +129,61 @@ class DataAnalyzer:
                 self.send_to_wandb(fig, title)
             else:
                 plt.savefig(f"{title}.png")
+                
+    def visualize_heatmap_groupby(
+        self,
+        title: str,
+        x_key: str,
+        y_key: str,
+        groupby: str,
+        data: list,
+        x_label: str = None,
+        y_label: str = None,
+    ):
+        
+        fig, ax = plt.subplots(figsize=(20, 20))
+
+        # Create DataFrame and process it
+        df_original = pd.DataFrame(data)
+        df = df_original.copy()
+
+        # Convert column to numeric and drop NaNs
+        df['Stockfish_Skill_Level'] = pd.to_numeric(df['Stockfish_Skill_Level'], errors='coerce')
+        df.dropna(inplace=True)
+
+        # Group by necessary columns
+        # print(df)
+        # df = df[f'{x_key}', f'{y_key}'].unique()
+        df = df.groupby([f'{x_key}', f'{y_key}']).mean().reset_index()
+        annotations = df.copy()
+        print("\u00B1")
+        for i in range(len(annotations)):
+            # annotations.loc[i, annotations[groupby]] = f'{str(round(annotations.loc[i, annotations[groupby]]))} \u00B1 {str(round(annotations.loc[i, annotations['deviation']]))}'
+            annotations.loc[i, groupby] = f"{round(annotations.loc[i, groupby])} \u00B1 {round(annotations.loc[i, 'deviation'])}"
+
+        print(df)
+        print(annotations)
+
+        # Pivot into matrix form
+        pivot_table = df.pivot(index=y_key, columns=x_key, values=groupby)
+        pivot_table_annotations = annotations.pivot(index=y_key, columns=x_key, values=groupby)
+        print(pivot_table)
+        print(pivot_table_annotations)
+        assert pivot_table.shape == pivot_table_annotations.shape
+            
+        sns.set_theme(font_scale=1.8)
+        # sns.heatmap(pivot_table, annot=True, fmt=".0f", annot_kws={'size': 30}, cmap="Blues", vmin= 1500, vmax=1800, square=True, linewidth=0.3, cbar_kws={"shrink": .8})
+        sns.heatmap(pivot_table, annot=pivot_table_annotations, fmt='', annot_kws={'size': 30}, cmap="Blues", vmin= 1500, vmax=1800, square=True, linewidth=0.3, cbar_kws={"shrink": .8})
+        
+        
+        plt.xlabel(x_label, fontsize=35, labelpad=40)
+        plt.xticks(fontsize=25)
+        plt.ylabel(y_label, fontsize=35, labelpad=40)
+        plt.yticks(fontsize=25)
+        plt.title(title, fontsize=40, pad=40)
+        # plt.show()
+        
+        if self.export_to_wandb:
+            self.send_to_wandb(fig, title)
+        else:
+            plt.savefig(f"{title}.png")
